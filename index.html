@@ -191,7 +191,36 @@
 
         function openAuthModal(cb) { pendingAction = cb; document.getElementById('authModal').style.display = 'flex'; document.getElementById('pinInput').focus(); }
         function closeAuthModal() { document.getElementById('authModal').style.display = 'none'; document.getElementById('pinInput').value = ''; pendingAction = null; }
-        function verifyPin() { if (document.getElementById('pinInput').value === "1234") { if (pendingAction) pendingAction(); closeAuthModal(); } else { alert("Wrong PIN"); document.getElementById('pinInput').value = ''; } }
+        // NEW SECURE AUTH LOGIC
+async function verifyPin() {
+    const enteredPin = document.getElementById('pinInput').value;
+
+    if (!enteredPin) return;
+
+    try {
+        // Query the database to see if the entered PIN exists in your secret table
+        const { data, error } = await _supabase
+            .from('secret_auth')
+            .select('pin_code')
+            .eq('pin_code', enteredPin)
+            .single();
+
+        if (error) {
+            console.error("Auth error:", error.message);
+            alert("Access Denied: Incorrect PIN");
+            document.getElementById('pinInput').value = '';
+            return;
+        }
+
+        if (data) {
+            // PIN matched! Execute the pending action (delete or clear)
+            if (pendingAction) pendingAction();
+            closeAuthModal();
+        }
+    } catch (err) {
+        alert("Verification failed. Please check your connection.");
+    }
+}
         async function deleteLog(id) { await _supabase.from('expense_logs').delete().eq('id', id); fetchData(); }
         async function clearAllLogs() { if(confirm("Clear history?")) { await _supabase.from('expense_logs').delete().neq('id', 0); fetchData(); } }
         async function addNewPerson() { const n = prompt("Name:"); if(n) { await _supabase.from('colleagues').insert([{ name: n }]); fetchData(); } }
