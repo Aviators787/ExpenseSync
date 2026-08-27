@@ -19,22 +19,44 @@
         input, select { border-radius: 12px !important; padding: 14px !important; outline: none; width: 100%; }
         
         @media print {
-            nav, header, .no-print { display: none !important; }
-            .card-elegant { border: 1px solid #000; box-shadow: none; margin-bottom: 10px; break-inside: avoid; }
-            body { padding: 0; background: white; }
+            nav, header, .no-print, #authModal, #masterModal { 
+                display: none !important; 
+            }
+            body { 
+                padding: 0; 
+                background: white; 
+                color: #000;
+            }
+            .card-elegant { 
+                box-shadow: none !important; 
+                border: none !important; 
+                padding: 0 !important; 
+            }
+            table { 
+                width: 100% !important; 
+                border-collapse: collapse !important; 
+            }
+            th, td { 
+                border-bottom: 1px solid #ddd !important; 
+                padding: 8px 4px !important; 
+                font-size: 10px !important; 
+            }
         }
     </style>
 </head>
 <body>
 
-    <header class="p-8 flex justify-between items-center sticky top-0 z-[1001] bg-white/90 backdrop-blur-md">
+    <header class="p-6 flex justify-between items-center sticky top-0 z-[1001] bg-white/90 backdrop-blur-md border-b border-gray-100">
         <div>
             <h1 class="text-xl font-light tracking-[0.15em] uppercase">ExpenseSync<span class="text-indigo-500">.</span></h1>
-            <p class="text-[9px] font-bold text-gray-400 uppercase tracking-[0.4em]">Financial Ledger</p>
+            <p id="userStatus" class="text-[9px] font-bold text-gray-400 uppercase tracking-[0.2em]">Not Logged In</p>
         </div>
-        <button onclick="fetchData()" class="w-10 h-10 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:text-indigo-500 transition-all">
-            <i class="ri-refresh-line text-lg"></i>
-        </button>
+        <div class="flex items-center gap-2">
+            <button id="authBtn" onclick="toggleAuthModal()" class="text-[10px] font-bold uppercase tracking-widest px-3 py-1.5 bg-indigo-50 text-indigo-600 rounded-xl">Login</button>
+            <button onclick="fetchData()" class="w-9 h-9 flex items-center justify-center rounded-full bg-gray-50 text-gray-400 hover:text-indigo-500 transition-all">
+                <i class="ri-refresh-line text-lg"></i>
+            </button>
+        </div>
     </header>
 
     <main class="max-w-xl mx-auto p-6 space-y-6">
@@ -43,30 +65,106 @@
         </div>
 
         <div id="tab-history" class="tab-content hidden">
-            <div class="flex justify-between items-center mb-6 px-2">
-                <button onclick="window.print()" class="text-[10px] text-indigo-600 font-bold uppercase tracking-widest px-3 py-1 bg-indigo-50 rounded-full">
-                    <i class="ri-printer-line mr-1"></i> Print Report
-                </button>
-                <button onclick="openAuthModal(clearAllLogs)" class="text-[10px] text-red-500 font-bold uppercase tracking-widest px-3 py-1 bg-red-50 rounded-full">Clear All</button>
+            <!-- Filter Controls -->
+            <div class="card-elegant mb-6 space-y-4 no-print">
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-[9px] font-bold text-gray-400 uppercase tracking-wider block mb-1">Filter by Member</label>
+                        <select id="filterMemberSelect" onchange="renderHistoryAndPeople()" class="bg-gray-50 text-xs p-2 ring-1 ring-gray-100">
+                            <option value="ALL">All Members</option>
+                        </select>
+                    </div>
+                    <div class="grid grid-cols-2 gap-3">
+                        <div>
+                            <label class="text-[9px] font-bold text-gray-400 uppercase tracking-wider block mb-1">From Date</label>
+                            <input type="date" id="filterFromDate" onchange="renderHistoryAndPeople()" class="bg-gray-50 text-xs p-2 ring-1 ring-gray-100">
+                        </div>
+                        <div>
+                            <label class="text-[9px] font-bold text-gray-400 uppercase tracking-wider block mb-1">To Date</label>
+                            <input type="date" id="filterToDate" onchange="renderHistoryAndPeople()" class="bg-gray-50 text-xs p-2 ring-1 ring-gray-100">
+                        </div>
+                    </div>
+                </div>
+                <div class="flex justify-between items-center pt-2">
+                    <button onclick="window.print()" class="text-[10px] text-indigo-600 font-bold uppercase tracking-widest px-4 py-2 bg-indigo-50 rounded-xl">
+                        <i class="ri-printer-line mr-1"></i> Print Statement
+                    </button>
+                    <button id="btnAdminClear" onclick="clearAllLogs()" class="hidden text-[10px] text-red-500 font-bold uppercase tracking-widest px-3 py-1 bg-red-50 rounded-full">Clear All (Admin)</button>
+                </div>
             </div>
-            <div id="historyLog" class="space-y-3"></div>
+
+            <!-- Ledger Printable Section -->
+            <div id="printableLedger">
+                <div class="hidden print:block mb-6 text-center">
+                    <h2 class="text-xl font-bold uppercase tracking-widest" id="printReportTitle">Expense Ledger Statement</h2>
+                    <p id="printDateRange" class="text-xs text-gray-500 font-medium"></p>
+                </div>
+
+                <!-- Summary Header -->
+                <div class="grid grid-cols-4 gap-2 mb-6">
+                    <div class="p-3 bg-gray-50 rounded-2xl border border-gray-100 text-center">
+                        <p class="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Times Paid</p>
+                        <p id="summaryTimesPaid" class="text-base font-semibold text-gray-900 mt-1">0</p>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-2xl border border-gray-100 text-center">
+                        <p class="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Total Paid Out</p>
+                        <p id="summaryTotalPaid" class="text-base font-semibold text-gray-900 mt-1">0.00</p>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-2xl border border-gray-100 text-center">
+                        <p class="text-[8px] font-bold text-gray-400 uppercase tracking-wider">My Share Expense</p>
+                        <p id="summaryMyShare" class="text-base font-semibold text-indigo-600 mt-1">0.00</p>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-2xl border border-gray-100 text-center">
+                        <p class="text-[8px] font-bold text-gray-400 uppercase tracking-wider">Net Balance</p>
+                        <p id="summaryNetBalance" class="text-base font-semibold text-emerald-600 mt-1">0.00</p>
+                    </div>
+                </div>
+
+                <!-- Ledger Table -->
+                <div class="overflow-x-auto">
+                    <table class="w-full text-left text-xs border-collapse">
+                        <thead>
+                            <tr class="border-b-2 border-gray-200 text-gray-400 uppercase tracking-wider text-[9px]">
+                                <th class="py-3 px-2">Date</th>
+                                <th class="py-3 px-2">Description</th>
+                                <th class="py-3 px-2">Paid By</th>
+                                <th class="py-3 px-2">Split With</th>
+                                <th class="py-3 px-2 text-right">Total Amt</th>
+                                <th class="py-3 px-2 text-right">Per Head</th>
+                                <th class="py-3 px-2 text-center no-print">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="ledgerTableBody" class="divide-y divide-gray-100"></tbody>
+                    </table>
+                </div>
+            </div>
         </div>
 
         <div id="tab-people" class="tab-content hidden">
-            <button onclick="openAuthModal(addNewPerson)" class="w-full mb-6 bg-gray-900 text-white py-4 rounded-2xl text-[10px] font-bold uppercase tracking-widest">+ Add Member</button>
             <div id="peopleList" class="space-y-3"></div>
         </div>
     </main>
 
-    <!-- PIN Auth Modal -->
+    <!-- Supabase Auth Modal -->
     <div id="authModal" class="fixed inset-0 hidden items-center justify-center z-[3000] p-6">
-        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm"></div>
-        <div class="relative bg-white p-8 rounded-3xl w-full max-w-xs text-center">
-            <h3 class="text-xs font-bold uppercase tracking-widest mb-4">Verification Required</h3>
-            <input type="password" id="pinInput" placeholder="PIN" class="text-center text-2xl tracking-[0.5em] mb-4 bg-gray-50 border-none ring-1 ring-gray-100">
-            <div class="flex gap-2">
-                <button onclick="closeAuthModal()" class="flex-1 py-3 text-[10px] font-bold uppercase text-gray-400">Cancel</button>
-                <button onclick="verifyPin()" class="flex-1 py-3 text-[10px] font-bold uppercase bg-indigo-600 text-white rounded-xl">Confirm</button>
+        <div class="absolute inset-0 bg-gray-900/60 backdrop-blur-sm" onclick="toggleAuthModal()"></div>
+        <div class="relative bg-white p-8 rounded-3xl w-full max-w-sm space-y-4 shadow-2xl">
+            <h3 class="text-xs font-bold uppercase tracking-widest text-center mb-2">Member Authentication</h3>
+            <div>
+                <label class="text-[9px] font-bold text-gray-400 uppercase mb-1 block">Email</label>
+                <input type="email" id="authEmail" placeholder="your@email.com" class="bg-gray-50 border-none ring-1 ring-gray-100 text-sm">
+            </div>
+            <div>
+                <label class="text-[9px] font-bold text-gray-400 uppercase mb-1 block">Password</label>
+                <input type="password" id="authPassword" placeholder="••••••••" class="bg-gray-50 border-none ring-1 ring-gray-100 text-sm">
+            </div>
+            <div>
+                <label class="text-[9px] font-bold text-gray-400 uppercase mb-1 block">Full Name (Required for Sign Up)</label>
+                <input type="text" id="authName" placeholder="Your Name" class="bg-gray-50 border-none ring-1 ring-gray-100 text-sm">
+            </div>
+            <div class="flex gap-2 pt-2">
+                <button onclick="handleLogin()" class="flex-1 py-3 text-[10px] font-bold uppercase bg-indigo-600 text-white rounded-xl">Sign In</button>
+                <button onclick="handleSignUp()" class="flex-1 py-3 text-[10px] font-bold uppercase bg-gray-900 text-white rounded-xl">Sign Up</button>
             </div>
         </div>
     </div>
@@ -78,22 +176,34 @@
         <a href="javascript:void(0)" class="nav-item" onclick="showTab('people', this)"><i class="ri-group-line text-2xl"></i></a>
     </nav>
 
+    <!-- Master Modal -->
     <div id="masterModal" class="fixed inset-0 hidden items-center justify-center z-[2000] p-6">
         <div class="absolute inset-0 bg-gray-900/40 backdrop-blur-md" onclick="closeModal()"></div>
         <div class="relative w-full max-w-md bg-white rounded-[32px] p-8 shadow-2xl">
-            <div class="space-y-6">
+            <div class="space-y-5">
                 <div class="flex p-1 bg-gray-100 rounded-xl">
                     <button id="btnExp" onclick="setEntryType('Expense')" class="flex-1 py-2 text-[10px] font-bold uppercase rounded-lg transition-all bg-white shadow-sm text-indigo-600">Expense</button>
                     <button id="btnSet" onclick="setEntryType('Settlement')" class="flex-1 py-2 text-[10px] font-bold uppercase rounded-lg transition-all text-gray-400">Settlement</button>
                     <input type="hidden" id="tType" value="Expense">
                 </div>
-                <div class="space-y-4">
+                <div class="space-y-3">
                     <input id="tDesc" type="text" placeholder="Description" class="bg-gray-50 border-none ring-1 ring-gray-100 text-sm">
                     <input id="tAmount" type="number" placeholder="Amount" class="bg-gray-50 border-none ring-1 ring-gray-100 text-xl font-light">
-                    <select id="tPayer" class="bg-gray-50 border-none ring-1 ring-gray-100 text-sm"></select>
                 </div>
-                <div id="sharerSection" class="p-4 bg-gray-50 rounded-2xl space-y-3"></div>
-                <button onclick="saveTransaction()" class="w-full bg-gray-900 text-white py-5 rounded-2xl text-[11px] font-bold tracking-[0.2em] uppercase shadow-xl">Confirm Entry</button>
+                
+                <div id="onBehalfContainer" class="hidden mb-4">
+                    <label class="block text-xs font-bold text-indigo-600 uppercase tracking-wider mb-1">
+                        Admin: Entry For Member
+                    </label>
+                    <select id="onBehalfSelect" class="w-full p-2 border border-indigo-200 rounded-lg text-sm bg-indigo-50/30">
+                    </select>
+                </div>
+                
+                <div>
+                    <label class="text-[9px] font-bold text-gray-400 uppercase tracking-wider block mb-2">Split With (Approved Members)</label>
+                    <div id="sharerSection" class="p-3 bg-gray-50 rounded-2xl space-y-3"></div>
+                </div>
+                <button onclick="saveTransaction()" class="w-full bg-gray-900 text-white py-4 rounded-2xl text-[11px] font-bold tracking-[0.2em] uppercase shadow-xl">Submit for Approval</button>
             </div>
         </div>
     </div>
@@ -103,149 +213,507 @@
         const SB_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImxodHF4cXN6aHdyamhqd2ZsZG5zIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzc2NTI2MTEsImV4cCI6MjA5MzIyODYxMX0.-u0C3vI4ib5TOrTbblsCXeunf_gvWPTXHVHb3QxYWfc'; 
         const _supabase = supabase.createClient(SB_URL, SB_KEY);
         
-        let people = []; let logs = []; let pendingAction = null;
+        let currentUser = null;
+        let isAdmin = false;
+        let people = []; 
+        let logs = [];
+
+        async function initAuth() {
+            const { data: { session } } = await _supabase.auth.getSession();
+            await updateUserSession(session?.user || null);
+
+            _supabase.auth.onAuthStateChange(async (_event, session) => {
+                await updateUserSession(session?.user || null);
+            });
+        }
+
+        function getUserDisplayName() {
+            return currentUser?.user_metadata?.display_name || currentUser?.email || 'Unknown';
+        }
+
+        async function updateUserSession(user) {
+            currentUser = user;
+            isAdmin = false;
+            const statusEl = document.getElementById('userStatus');
+            const authBtn = document.getElementById('authBtn');
+
+            if (currentUser) {
+                const displayName = getUserDisplayName();
+
+                let { data } = await _supabase.from('colleagues')
+                    .select('is_admin, id')
+                    .eq('user_id', currentUser.id)
+                    .maybeSingle();
+
+                if (!data) {
+                    const { data: nameMatch } = await _supabase.from('colleagues')
+                        .select('is_admin, id')
+                        .ilike('name', displayName)
+                        .maybeSingle();
+                    
+                    if (nameMatch) {
+                        data = nameMatch;
+                        await _supabase.from('colleagues').update({ user_id: currentUser.id }).eq('id', nameMatch.id);
+                    }
+                }
+
+                if (data && data.is_admin) isAdmin = true;
+
+                statusEl.innerHTML = `Logged in: ${displayName} <span class="${isAdmin ? 'text-indigo-600 font-extrabold' : 'text-gray-400'} ml-1">[${isAdmin ? 'ADMIN' : 'MEMBER'}]</span>`;
+                authBtn.textContent = 'Logout';
+                authBtn.onclick = () => _supabase.auth.signOut();
+                
+                if(isAdmin) document.getElementById('btnAdminClear')?.classList.remove('hidden');
+            } else {
+                statusEl.textContent = 'Not Logged In';
+                authBtn.textContent = 'Login';
+                authBtn.onclick = toggleAuthModal;
+                document.getElementById('btnAdminClear')?.classList.add('hidden');
+            }
+            fetchData();
+        }
+
+        function toggleAuthModal() {
+            const el = document.getElementById('authModal');
+            if (el.classList.contains('hidden')) {
+                el.classList.remove('hidden');
+                el.classList.add('flex');
+            } else {
+                el.classList.add('hidden');
+                el.classList.remove('flex');
+            }
+        }
+
+        async function handleLogin() {
+            const email = document.getElementById('authEmail').value;
+            const password = document.getElementById('authPassword').value;
+
+            if (!email || !password) return alert("Please enter both email and password.");
+
+            const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
+            
+            if (error) {
+                alert(error.message);
+            } else {
+                toggleAuthModal();
+                await updateUserSession(data.session?.user || null);
+            }
+        }
+
+        async function handleSignUp() {
+            const email = document.getElementById('authEmail').value;
+            const password = document.getElementById('authPassword').value;
+            const name = document.getElementById('authName').value;
+            
+            if (!name) return alert("Please provide a display name.");
+            const { data, error } = await _supabase.auth.signUp({ email, password, options: { data: { display_name: name } } });
+
+            if (error) {
+                alert(error.message);
+            } else {
+                if (data.user) {
+                    await _supabase.from('colleagues').insert([{ name: name, user_id: data.user.id, is_approved: false }]);
+                }
+                alert("Account created! An admin must approve your account before you can split expenses.");
+                toggleAuthModal();
+            }
+        }
 
         async function fetchData() {
             const { data: pData } = await _supabase.from('colleagues').select('*').order('name');
-            const { data: lData } = await _supabase.from('expense_logs').select('*').order('created_at', { ascending: false });
+            const { data: lData } = await _supabase.from('expense_logs').select('*').or('is_deleted.is.null,is_deleted.eq.false').order('created_at', { ascending: false });
             people = pData || []; logs = lData || [];
+            
+            // Populate member filter dropdown
+            const filterMemberSelect = document.getElementById('filterMemberSelect');
+            if (filterMemberSelect) {
+                const currentVal = filterMemberSelect.value;
+                const approvedPeople = people.filter(p => p.is_approved);
+                filterMemberSelect.innerHTML = `<option value="ALL">All Members</option>` + 
+                    approvedPeople.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+                filterMemberSelect.value = currentVal || 'ALL';
+            }
+
             renderHybridBalances(); renderHistoryAndPeople();
         }
 
-        // Expanded Date & Time Format
         function formatDateTime(isoString) {
+            if (!isoString) return '';
             const date = new Date(isoString);
-            return date.toLocaleDateString('en-GB', { 
-                weekday: 'short', 
-                day: '2-digit', 
-                month: 'short', 
-                year: 'numeric' 
-            }) + ' • ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+            return date.toLocaleDateString('en-GB', { day: '2-digit', month: 'short' }) + ' • ' + date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
         }
 
         function renderHybridBalances() {
-            let bals = {}; let debtMatrix = {};
-            people.forEach(p => { bals[p.name] = 0; debtMatrix[p.name] = {}; people.forEach(p2 => { if(p.name !== p2.name) debtMatrix[p.name][p2.name] = 0; }); });
+            let bals = {}; 
+            let debtMatrix = {};
+            const approvedPeople = people.filter(p => p.is_approved);
             
-            logs.forEach(l => {
+            approvedPeople.forEach(p => { 
+                bals[p.name] = 0; 
+                debtMatrix[p.name] = {}; 
+                approvedPeople.forEach(p2 => { 
+                    if(p.name !== p2.name) debtMatrix[p.name][p2.name] = 0; 
+                }); 
+            });
+            
+            logs.filter(l => l.is_approved).forEach(l => {
                 const amt = parseFloat(l.total_amount);
                 if (l.type === 'Expense') {
-                    const active = l.shared_with.filter(n => bals.hasOwnProperty(n));
+                    const active = (l.shared_with || []).filter(n => bals.hasOwnProperty(n));
                     if (active.length === 0) return;
                     const share = amt / active.length;
                     if(bals.hasOwnProperty(l.paid_by)) bals[l.paid_by] += amt;
-                    active.forEach(s => { bals[s] -= share; if (s !== l.paid_by) debtMatrix[s][l.paid_by] += share; });
+                    active.forEach(s => { 
+                        bals[s] -= share; 
+                        if (s !== l.paid_by) debtMatrix[s][l.paid_by] += share; 
+                    });
                 } else {
-                    const r = l.shared_with[0];
+                    const r = (l.shared_with || [])[0];
                     if(bals.hasOwnProperty(l.paid_by)) bals[l.paid_by] += amt;
                     if(bals.hasOwnProperty(r)) bals[r] -= amt;
-                    if(debtMatrix[l.paid_by] && debtMatrix[l.paid_by][r] !== undefined) debtMatrix[l.paid_by][r] -= amt;
+                    if(debtMatrix[l.paid_by] && debtMatrix[l.paid_by][r] !== undefined) {
+                        debtMatrix[l.paid_by][r] -= amt;
+                    }
                 }
             });
 
-            document.getElementById('balanceList').innerHTML = people.map(p => {
-                const bal = Math.round(bals[p.name] || 0);
+            document.getElementById('balanceList').innerHTML = approvedPeople.map(p => {
+                const rawBal = bals[p.name] || 0;
+                const isSettled = Math.abs(rawBal) < 0.01; 
+                const balFormatted = Math.abs(rawBal).toFixed(2);
+                
+                let statusBadge = '';
+                if (isSettled) {
+                    statusBadge = `<span class="text-[9px] font-bold text-emerald-500 uppercase tracking-wider">Settled Up</span>`;
+                } else if (rawBal > 0) {
+                    statusBadge = `<span class="text-[9px] font-bold text-indigo-500 uppercase tracking-wider">To Receive</span>`;
+                } else {
+                    statusBadge = `<span class="text-[9px] font-bold text-red-500 uppercase tracking-wider">To Pay</span>`;
+                }
+
                 let sub = [];
-                people.forEach(o => {
+                approvedPeople.forEach(o => {
                     if (p.name === o.name) return;
                     let net = (debtMatrix[p.name][o.name] || 0) - (debtMatrix[o.name][p.name] || 0);
-                    // Fixed spacing and formatting below
-                    if (net > 0.5) sub.push(`<div class="details-row text-red-500"><span>Pay to ${o.name}</span> <span class="font-bold">${Math.round(net).toLocaleString()}</span></div>`);
-                    else if (net < -0.5) sub.push(`<div class="details-row text-emerald-600"><span>Receive from ${o.name}</span> <span class="font-bold">${Math.round(Math.abs(net)).toLocaleString()}</span></div>`);
+                    
+                    if (net > 0.009) {
+                        sub.push(`<div class="flex justify-between text-[11px] text-red-500 font-medium"><span>Pay to ${o.name}</span> <span class="font-bold">${net.toFixed(2)}</span></div>`);
+                    } else if (net < -0.009) {
+                        sub.push(`<div class="flex justify-between text-[11px] text-emerald-600 font-medium"><span>Receive from ${o.name}</span> <span class="font-bold">${Math.abs(net).toFixed(2)}</span></div>`);
+                    }
                 });
-                return `<div class="card-elegant" onclick="this.querySelector('.details').classList.toggle('hidden')">
-                    <div class="flex justify-between items-center"><div><p class="name-label">${p.name}</p><p class="text-[9px] font-bold text-gray-300 uppercase mt-1">${bal >= 0 ? 'To Receive' : 'To Pay'}</p></div><p class="text-2xl font-light ${bal >= 0 ? 'text-indigo-600' : 'text-red-500'}">${Math.abs(bal).toLocaleString()}</p></div>
-                    <div class="details hidden mt-4 pt-4 border-t border-gray-50 space-y-1">${sub.join('') || '<p class="text-[10px] text-gray-400 text-center py-2 italic">Settled</p>'}</div>
+
+                return `<div class="card-elegant cursor-pointer" onclick="this.querySelector('.details').classList.toggle('hidden')">
+                    <div class="flex justify-between items-center">
+                        <div>
+                            <p class="name-label">${p.name}</p>
+                            <p class="mt-1">${statusBadge}</p>
+                        </div>
+                        <p class="text-2xl font-light ${isSettled ? 'text-gray-400' : (rawBal > 0 ? 'text-indigo-600' : 'text-red-500')}">
+                            ${isSettled ? '0.00' : balFormatted}
+                        </p>
+                    </div>
+                    <div class="details hidden mt-4 pt-4 border-t border-gray-50 space-y-1">
+                        ${sub.join('') || '<p class="text-[10px] font-medium text-emerald-600 text-center py-2 uppercase tracking-widest">✓ All debts cleared</p>'}
+                    </div>
                 </div>`;
             }).join('');
         }
 
         function renderHistoryAndPeople() {
-            document.getElementById('historyLog').innerHTML = logs.map(l => `
-                <div class="card-elegant !p-5 bg-gray-50/50 border-none">
-                    <div class="flex justify-between items-start">
-                        <div class="space-y-1">
-                            <p class="text-sm font-medium text-gray-800">${l.description}</p>
-                            <p class="text-[9px] text-gray-400 font-bold uppercase tracking-wider">
-                                ${l.paid_by} • ${l.type} • ${formatDateTime(l.created_at)}
-                            </p>
-                        </div>
-                        <div class="flex flex-col items-end gap-3">
-                            <p class="font-medium text-sm text-gray-900">${Math.round(l.total_amount).toLocaleString()}</p>
-                            <button onclick="openAuthModal(() => deleteLog(${l.id}))" class="text-gray-300 hover:text-red-500 no-print">
-                                <i class="ri-delete-bin-line text-lg"></i>
-                            </button>
-                        </div>
-                    </div>
-                </div>`).join('');
+            const selectedMember = document.getElementById('filterMemberSelect')?.value || 'ALL';
+            const fromDateVal = document.getElementById('filterFromDate')?.value;
+            const toDateVal = document.getElementById('filterToDate')?.value;
 
-            document.getElementById('peopleList').innerHTML = people.map(p => `
-                <div class="card-elegant !p-5 flex justify-between items-center">
-                    <p class="name-label !text-sm">${p.name}</p>
-                    <button onclick="openAuthModal(() => deletePerson(${p.id}))" class="text-gray-300 hover:text-red-500"><i class="ri-close-circle-line text-xl"></i></button>
-                </div>`).join('');
+            let filteredLogs = logs.filter(l => l.is_approved);
+
+            // Filter by Member if selected
+            if (selectedMember !== 'ALL') {
+                filteredLogs = filteredLogs.filter(l => {
+                    const paidByMember = (l.paid_by === selectedMember);
+                    const splitWithMember = (l.shared_with || []).includes(selectedMember);
+                    return paidByMember || splitWithMember;
+                });
+            }
+
+            // Filter by Date
+            if (fromDateVal) {
+                const fromTS = new Date(fromDateVal + 'T00:00:00').getTime();
+                filteredLogs = filteredLogs.filter(l => new Date(l.created_at).getTime() >= fromTS);
+            }
+            if (toDateVal) {
+                const toTS = new Date(toDateVal + 'T23:59:59').getTime();
+                filteredLogs = filteredLogs.filter(l => new Date(l.created_at).getTime() <= toTS);
+            }
+
+            let timesPaidCount = 0;
+            let totalPaidAmount = 0;
+            let myShareExpenseTotal = 0;
+
+            const tableRows = filteredLogs.map(l => {
+                const amt = parseFloat(l.total_amount) || 0;
+                const sharers = (l.shared_with && l.shared_with.length > 0) ? l.shared_with : [];
+                const perHead = (l.type === 'Expense' && sharers.length > 0) ? (amt / sharers.length) : 0;
+
+                // Metrics calculation for selected member or overall
+                if (selectedMember !== 'ALL') {
+                    if (l.paid_by === selectedMember) {
+                        timesPaidCount++;
+                        totalPaidAmount += amt;
+                    }
+                    if (l.type === 'Expense' && sharers.includes(selectedMember)) {
+                        myShareExpenseTotal += perHead;
+                    } else if (l.type === 'Settlement') {
+                        if (sharers.includes(selectedMember)) {
+                            myShareExpenseTotal += amt; // Received settlement
+                        }
+                    }
+                } else {
+                    if (l.type === 'Expense') {
+                        totalPaidAmount += amt;
+                        myShareExpenseTotal += amt;
+                    }
+                }
+
+                const creatorInfo = (l.created_by && l.created_by !== l.paid_by) ? ` (By ${l.created_by})` : '';
+
+                return `
+                    <tr class="hover:bg-gray-50/50">
+                        <td class="py-3 px-2 font-medium whitespace-nowrap">${formatDateTime(l.created_at)}</td>
+                        <td class="py-3 px-2 text-gray-800">${l.description} <span class="text-[9px] text-gray-400 uppercase">(${l.type})</span></td>
+                        <td class="py-3 px-2 font-semibold text-gray-700">${l.paid_by}${creatorInfo}</td>
+                        <td class="py-3 px-2 text-indigo-600 font-medium">${sharers.join(', ')}</td>
+                        <td class="py-3 px-2 text-right font-semibold">${amt.toFixed(2)}</td>
+                        <td class="py-3 px-2 text-right text-gray-500">${perHead > 0 ? perHead.toFixed(2) : '-'}</td>
+                        <td class="py-3 px-2 text-center no-print">
+                            ${isAdmin ? `<button onclick="deleteLog(${l.id})" class="text-gray-300 hover:text-red-500"><i class="ri-delete-bin-line"></i></button>` : ''}
+                        </td>
+                    </tr>
+                `;
+            }).join('');
+
+            document.getElementById('ledgerTableBody').innerHTML = tableRows || `<tr><td colspan="7" class="py-6 text-center text-gray-400">No records found for selected criteria.</td></tr>`;
+
+            // Update Summary Header Indicators
+            document.getElementById('summaryTimesPaid').textContent = (selectedMember !== 'ALL') ? timesPaidCount : filteredLogs.length;
+            document.getElementById('summaryTotalPaid').textContent = totalPaidAmount.toFixed(2);
+            document.getElementById('summaryMyShare').textContent = myShareExpenseTotal.toFixed(2);
             
-            document.getElementById('tPayer').innerHTML = people.map(p => `<option value="${p.name}">${p.name}</option>`).join('');
+            const netBalance = totalPaidAmount - myShareExpenseTotal;
+            const netEl = document.getElementById('summaryNetBalance');
+            netEl.textContent = (netBalance >= 0 ? '+' : '') + netBalance.toFixed(2);
+            netEl.className = `text-base font-semibold mt-1 ${netBalance >= 0 ? 'text-emerald-600' : 'text-red-500'}`;
+
+            // Update Print Header Title
+            const printTitleEl = document.getElementById('printReportTitle');
+            if (printTitleEl) {
+                printTitleEl.textContent = selectedMember !== 'ALL' 
+                    ? `Expense Ledger: ${selectedMember}` 
+                    : `Group Expense Ledger Statement`;
+            }
+
+            const printRangeEl = document.getElementById('printDateRange');
+            if (printRangeEl) {
+                printRangeEl.textContent = `Period: ${fromDateVal || 'All Time'} to ${toDateVal || 'Present'}`;
+            }
+
+            // Render People List tab
+            document.getElementById('peopleList').innerHTML = people.map(p => {
+                const pStatus = p.is_approved 
+                    ? `<span class="text-[9px] text-emerald-500 font-bold uppercase tracking-wider">Active Member</span>`
+                    : `<span class="text-[9px] text-amber-500 font-bold uppercase tracking-wider">Pending Approval</span>`;
+                
+                let pActions = '';
+                if (isAdmin) {
+                    pActions = `
+                        ${!p.is_approved ? `<button onclick="approvePerson(${p.id})" class="text-emerald-500 hover:text-emerald-600"><i class="ri-check-line text-xl"></i></button>` : ''}
+                        <button onclick="deletePerson(${p.id})" class="text-gray-300 hover:text-red-500"><i class="ri-close-circle-line text-xl"></i></button>
+                    `;
+                }
+
+                return `
+                <div class="card-elegant !p-5 flex justify-between items-center ${!p.is_approved ? 'border-amber-100' : ''}">
+                    <div>
+                        <p class="name-label !text-sm flex items-center gap-2">${p.name} ${p.is_admin ? '<i class="ri-shield-star-line text-indigo-500 text-sm"></i>' : ''}</p>
+                        ${pStatus}
+                    </div>
+                    <div class="flex items-center gap-3">${pActions}</div>
+                </div>`;
+            }).join('');
+            
             toggleType();
         }
 
-        function openAuthModal(cb) { pendingAction = cb; document.getElementById('authModal').style.display = 'flex'; document.getElementById('pinInput').focus(); }
-        function closeAuthModal() { document.getElementById('authModal').style.display = 'none'; document.getElementById('pinInput').value = ''; pendingAction = null; }
-        // NEW SECURE AUTH LOGIC
-async function verifyPin() {
-    const enteredPin = document.getElementById('pinInput').value;
-
-    if (!enteredPin) return;
-
-    try {
-        // Query the database to see if the entered PIN exists in your secret table
-        const { data, error } = await _supabase
-            .from('secret_auth')
-            .select('pin_code')
-            .eq('pin_code', enteredPin)
-            .single();
-
-        if (error) {
-            console.error("Auth error:", error.message);
-            alert("Access Denied: Incorrect PIN");
-            document.getElementById('pinInput').value = '';
-            return;
+        async function approveLog(id) {
+            if(!isAdmin) return;
+            await _supabase.from('expense_logs').update({ is_approved: true }).eq('id', id);
+            fetchData();
         }
 
-        if (data) {
-            // PIN matched! Execute the pending action (delete or clear)
-            if (pendingAction) pendingAction();
-            closeAuthModal();
+        async function approvePerson(id) {
+            if(!isAdmin) return;
+            await _supabase.from('colleagues').update({ is_approved: true }).eq('id', id);
+            fetchData();
         }
-    } catch (err) {
-        alert("Verification failed. Please check your connection.");
-    }
-}
-        async function deleteLog(id) { await _supabase.from('expense_logs').delete().eq('id', id); fetchData(); }
-        async function clearAllLogs() { if(confirm("Clear history?")) { await _supabase.from('expense_logs').delete().neq('id', 0); fetchData(); } }
-        async function addNewPerson() { const n = prompt("Name:"); if(n) { await _supabase.from('colleagues').insert([{ name: n }]); fetchData(); } }
-        async function deletePerson(id) { await _supabase.from('colleagues').delete().eq('id', id); fetchData(); }
-        function showTab(id, el) { document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden')); document.getElementById('tab-' + id).classList.remove('hidden'); document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('nav-active')); el.classList.add('nav-active'); }
-        function openAddModal() { document.getElementById('masterModal').style.display = 'flex'; }
-        function closeModal() { document.getElementById('masterModal').style.display = 'none'; }
-        function setEntryType(t) { document.getElementById('tType').value = t; document.getElementById('btnExp').className = (t === 'Expense') ? "flex-1 py-2 text-[10px] font-bold uppercase rounded-lg bg-white shadow-sm text-indigo-600" : "flex-1 py-2 text-[10px] font-bold uppercase rounded-lg text-gray-400"; document.getElementById('btnSet').className = (t !== 'Expense') ? "flex-1 py-2 text-[10px] font-bold uppercase rounded-lg bg-white shadow-sm text-indigo-600" : "flex-1 py-2 text-[10px] font-bold uppercase rounded-lg text-gray-400"; toggleType(); }
+
+        async function deleteLog(id) { 
+            if (!isAdmin) return alert("Only admins can delete entries.");
+            const deleterName = getUserDisplayName();
+
+            if (confirm(`Delete this expense log? (Action by ${deleterName})`)) {
+                let { error } = await _supabase
+                    .from('expense_logs')
+                    .update({ is_deleted: true, deleted_by: deleterName })
+                    .eq('id', id);
+
+                if (error) {
+                    const hardDeleteResult = await _supabase
+                        .from('expense_logs')
+                        .delete()
+                        .eq('id', id);
+
+                    if (hardDeleteResult.error) {
+                        return alert("Delete failed: " + hardDeleteResult.error.message);
+                    }
+                }
+                fetchData(); 
+            }
+        }
+
+        async function clearAllLogs() { 
+            if (!isAdmin) return alert("Only admins can clear all history.");
+            const deleterName = getUserDisplayName();
+
+            if (confirm(`Are you sure you want to clear ALL history logs?`)) { 
+                let { error } = await _supabase
+                    .from('expense_logs')
+                    .update({ is_deleted: true, deleted_by: deleterName })
+                    .neq('id', 0);
+
+                if (error) {
+                    const hardClearResult = await _supabase
+                        .from('expense_logs')
+                        .delete()
+                        .neq('id', 0);
+
+                    if (hardClearResult.error) {
+                        return alert("Clear all failed: " + hardClearResult.error.message);
+                    }
+                }
+                fetchData(); 
+            } 
+        }
+
+        async function deletePerson(id) { 
+            if (!isAdmin) return alert("Only admins can manage members.");
+            if(confirm("Remove this member?")) {
+                await _supabase.from('colleagues').delete().eq('id', id); 
+                fetchData();
+            }
+        }
+
+        function showTab(id, el) { 
+            document.querySelectorAll('.tab-content').forEach(t => t.classList.add('hidden')); 
+            document.getElementById('tab-' + id).classList.remove('hidden'); 
+            document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('nav-active')); 
+            el.classList.add('nav-active'); 
+        }
+
+        function openAddModal() {
+            if (!currentUser) return alert("Please login first to add an entry.");
+
+            const modal = document.getElementById('masterModal');
+            const container = document.getElementById('onBehalfContainer');
+            const select = document.getElementById('onBehalfSelect');
+
+            if (isAdmin) {
+                container.classList.remove('hidden');
+                select.innerHTML = people.filter(p => p.is_approved).map(p => 
+                    `<option value="${p.name}">${p.name}</option>`
+                ).join('');
+                select.value = getUserDisplayName();
+            } else {
+                container.classList.add('hidden');
+            }
+
+            document.getElementById('tDesc').value = '';
+            document.getElementById('tAmount').value = '';
+            setEntryType('Expense');
+
+            modal.classList.remove('hidden');
+            modal.classList.add('flex');
+        }
+
+        function closeModal() { 
+            const modal = document.getElementById('masterModal');
+            modal.classList.add('hidden');
+            modal.classList.remove('flex');
+        }
+        
+        function setEntryType(t) { 
+            document.getElementById('tType').value = t; 
+            document.getElementById('btnExp').className = (t === 'Expense') ? "flex-1 py-2 text-[10px] font-bold uppercase rounded-lg bg-white shadow-sm text-indigo-600" : "flex-1 py-2 text-[10px] font-bold uppercase rounded-lg text-gray-400"; 
+            document.getElementById('btnSet').className = (t !== 'Expense') ? "flex-1 py-2 text-[10px] font-bold uppercase rounded-lg bg-white shadow-sm text-indigo-600" : "flex-1 py-2 text-[10px] font-bold uppercase rounded-lg text-gray-400"; 
+            toggleType(); 
+        }
+        
         function toggleType() {
+            const approvedPeople = people.filter(p => p.is_approved);
             const t = document.getElementById('tType').value;
             const s = document.getElementById('sharerSection');
-            if (t === 'Settlement') s.innerHTML = `<select id="tReceiver" class="bg-white border-none ring-1 ring-gray-200 text-sm">${people.map(p => `<option value="${p.name}">${p.name}</option>`).join('')}</select>`;
-            else s.innerHTML = `<div class="grid grid-cols-2 gap-3">${people.map(p => `<label class="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl cursor-pointer"><span class="text-[11px] text-gray-800 font-medium uppercase">${p.name}</span><input type="checkbox" name="sharers" value="${p.name}" checked class="w-4 h-4 accent-indigo-600"></label>`).join('')}</div>`;
+            if (t === 'Settlement') {
+                s.innerHTML = `<select id="tReceiver" class="bg-white border-none ring-1 ring-gray-200 text-sm">${approvedPeople.map(p => `<option value="${p.name}">${p.name}</option>`).join('')}</select>`;
+            } else {
+                s.innerHTML = `<div class="grid grid-cols-2 gap-3">${approvedPeople.map(p => `<label class="flex items-center justify-between p-3 bg-white border border-gray-100 rounded-xl cursor-pointer"><span class="text-[11px] text-gray-800 font-medium uppercase">${p.name}</span><input type="checkbox" name="sharers" value="${p.name}" checked class="w-4 h-4 accent-indigo-600"></label>`).join('')}</div>`;
+            }
         }
+
         async function saveTransaction() {
-            const t = document.getElementById('tType').value;
-            const d = document.getElementById('tDesc').value;
-            const a = parseFloat(document.getElementById('tAmount').value);
-            const p = document.getElementById('tPayer').value;
-            let sh = (t === 'Expense') ? Array.from(document.querySelectorAll('input[name="sharers"]:checked')).map(cb => cb.value) : [document.getElementById('tReceiver').value];
-            if(!d || !a || sh.length === 0) return alert("Fill details");
-            const { error } = await _supabase.from('expense_logs').insert([{ description: d, total_amount: a, paid_by: p, shared_with: sh, type: t }]);
-            if(error) alert(error.message); else { closeModal(); fetchData(); }
+            const type = document.getElementById('tType').value;
+            const amount = parseFloat(document.getElementById('tAmount').value);
+            const description = document.getElementById('tDesc').value || (type === 'Expense' ? 'Expense' : 'Settlement');
+            const submitter = getUserDisplayName();
+            
+            let targetMember = submitter;
+            if (isAdmin && document.getElementById('onBehalfSelect')) {
+                targetMember = document.getElementById('onBehalfSelect').value;
+            }
+
+            if (!amount || amount <= 0) return alert('Please enter a valid amount.');
+
+            let sharedWith = [];
+            if (type === 'Expense') {
+                const checkboxes = document.querySelectorAll('input[name="sharers"]:checked');
+                sharedWith = Array.from(checkboxes).map(cb => cb.value);
+                if (sharedWith.length === 0) return alert('Select at least one member to split with.');
+            } else {
+                const recipientSelect = document.getElementById('tReceiver');
+                const recipient = recipientSelect ? recipientSelect.value : null;
+                if (!recipient) return alert('Select a recipient.');
+                sharedWith = [recipient];
+            }
+
+            const newLog = {
+                type: type,
+                total_amount: amount,
+                description: description,
+                paid_by: targetMember,
+                created_by: submitter,
+                shared_with: sharedWith,
+                is_approved: isAdmin
+            };
+
+            const { error } = await _supabase.from('expense_logs').insert([newLog]);
+
+            if (error) {
+                alert('Error saving entry: ' + error.message);
+            } else {
+                closeModal();
+                fetchData();
+            }
         }
-        fetchData();
+
+        initAuth();
     </script>
 </body>
 </html>
